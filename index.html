@@ -182,9 +182,16 @@
             }
           } else if (payload.eventType === "UPDATE") {
             const idx = chamados.findIndex((c) => c.id === payload.new.id);
-            // não sobrescreve o campo que a própria pessoa está digitando agora
-            if (idx !== -1 && !pendingTimers[payload.new.id]) {
-              chamados[idx] = fromDb(payload.new);
+            if (idx !== -1) {
+              const incoming = fromDb(payload.new);
+              // se estou editando algum campo desta linha agora, preserva o valor
+              // que já está no meu estado local (evita "voltar" o que acabei de digitar)
+              const activeEl = document.activeElement;
+              const activeRow = activeEl && activeEl.closest("tr");
+              if (activeRow && activeRow.dataset.id === payload.new.id && activeEl.dataset.field) {
+                incoming[activeEl.dataset.field] = chamados[idx][activeEl.dataset.field];
+              }
+              chamados[idx] = incoming;
             }
           } else if (payload.eventType === "DELETE") {
             chamados = chamados.filter((c) => c.id !== payload.old.id);
@@ -199,7 +206,9 @@
       window.addEventListener("offline", () => setSyncStatus("error", "Sem conexão"));
       window.addEventListener("online", () => setSyncStatus("online", "Sincronizado"));
 
-      // ---------- Render ----------
+      // ---------- Render (incremental — nunca recria uma linha já existente) ----------
+      const FIELDS = ["numero", "solicitante", "tipo", "pa", "obs", "status"];
+
       function render() {
         const term = state.search.trim().toLowerCase();
 
@@ -210,28 +219,51 @@
           return blob.includes(term);
         });
 
-        const activeEl = document.activeElement;
-        const activeId = activeEl && activeEl.closest("tr") ? activeEl.closest("tr").dataset.id : null;
-        const activeField = activeEl ? activeEl.dataset.field : null;
+        emptyState.hidden = visiveis.length !== 0;
 
-        tableBody.innerHTML = "";
+        // mapa das linhas que já existem no DOM
+        const existing = {};
+        Array.from(tableBody.children).forEach((tr) => {
+          existing[tr.dataset.id] = tr;
+        });
 
-        if (visiveis.length === 0) {
-          emptyState.hidden = false;
-        } else {
-          emptyState.hidden = true;
-          visiveis.forEach((c) => tableBody.appendChild(renderRow(c)));
-        }
+        const wantedIds = new Set(visiveis.map((c) => c.id));
 
-        // restaura o foco se a linha editada continuar visível após um update em tempo real
-        if (activeId && activeField) {
-          const el = tableBody.querySelector(`tr[data-id="${activeId}"] [data-field="${activeField}"]`);
-          if (el) el.focus();
-        }
+        // remove linhas que não devem mais aparecer (excluídas ou fora do filtro/busca)
+        Object.keys(existing).forEach((id) => {
+          if (!wantedIds.has(id)) {
+            existing[id].remove();
+            delete existing[id];
+          }
+        });
+
+        // cria ou atualiza cada linha, na ordem correta
+        visiveis.forEach((c) => {
+          let tr = existing[c.id];
+          if (!tr) {
+            tr = renderRow(c);
+          } else {
+            updateRowFields(tr, c);
+          }
+          // appendChild em um nó já existente apenas o reposiciona (não recria),
+          // então o foco do usuário não é perdido
+          tableBody.appendChild(tr);
+        });
 
         const pendentesCount = chamados.filter((c) => c.status === "pendente").length;
         statPendentes.textContent = pendentesCount;
         totalCount.textContent = `${chamados.length} chamado${chamados.length === 1 ? "" : "s"} no total`;
+      }
+
+      // Atualiza os valores de uma linha existente sem recriar os elementos,
+      // e nunca sobrescreve o campo que o usuário está editando neste instante.
+      function updateRowFields(tr, c) {
+        tr.classList.toggle("is-resolved", c.status === "resolvido");
+        FIELDS.forEach((field) => {
+          const el = tr.querySelector(`[data-field="${field}"]`);
+          if (!el || document.activeElement === el) return;
+          if (el.value !== c[field]) el.value = c[field];
+        });
       }
 
       function renderRow(c) {
@@ -312,7 +344,6 @@
       function queueUpdate(id, field, value) {
         const key = `${id}:${field}`;
         clearTimeout(pendingTimers[key]);
-        pendingTimers[id] = true;
         pendingTimers[key] = setTimeout(() => flushUpdate(id, field), DEBOUNCE_MS);
       }
 
@@ -320,7 +351,6 @@
         const key = `${id}:${field}`;
         clearTimeout(pendingTimers[key]);
         delete pendingTimers[key];
-        delete pendingTimers[id];
 
         const chamado = chamados.find((x) => x.id === id);
         if (!chamado) return;
