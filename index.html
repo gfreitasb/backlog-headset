@@ -240,14 +240,23 @@
         // cria ou atualiza cada linha, na ordem correta
         visiveis.forEach((c) => {
           let tr = existing[c.id];
+          const sendoEditada = tr && tr.contains(document.activeElement);
+
           if (!tr) {
             tr = renderRow(c);
-          } else {
-            updateRowFields(tr, c);
+            tableBody.appendChild(tr);
+            return;
           }
-          // appendChild em um nó já existente apenas o reposiciona (não recria),
-          // então o foco do usuário não é perdido
-          tableBody.appendChild(tr);
+
+          updateRowFields(tr, c);
+
+          // Se o usuário está com o cursor em algum campo desta linha agora,
+          // não mexe na posição dela no DOM — mesmo um appendChild "sem efeito"
+          // (nó já na posição certa) pode resetar o cursor pro início do campo,
+          // fazendo o texto digitado aparecer invertido.
+          if (!sendoEditada) {
+            tableBody.appendChild(tr);
+          }
         });
 
         const pendentesCount = chamados.filter((c) => c.status === "pendente").length;
@@ -316,6 +325,20 @@
             queueUpdate(c.id, field, input.value);
           });
 
+          // "Solicitado por": se colar no formato "Sobrenome, Nome" (comum em
+          // sistemas de RH/AD), corrige sozinho para "Nome Sobrenome".
+          if (field === "solicitante") {
+            input.addEventListener("paste", (e) => {
+              const texto = (e.clipboardData || window.clipboardData).getData("text");
+              if (texto.includes(",")) {
+                e.preventDefault();
+                input.value = corrigirNomeInvertido(texto);
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+              }
+              // sem vírgula: deixa o comportamento padrão de colar acontecer
+            });
+          }
+
           // selects gravam na hora; texto grava com debounce (evita 1 request por tecla)
           if (isSelect) {
             input.addEventListener("change", () => flushUpdate(c.id, field));
@@ -372,6 +395,17 @@
 
       function escapeHtml(str) {
         return (str || "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]));
+      }
+
+      // Corrige nomes colados no formato "Sobrenome(s), Nome" -> "Nome Sobrenome(s)".
+      // Ex: "Richelle Silva Braga, Priscilla" -> "Priscilla Richelle Silva Braga"
+      function corrigirNomeInvertido(texto) {
+        const partes = texto.split(",");
+        if (partes.length !== 2) return texto.trim().replace(/\s+/g, " ");
+        const sobrenome = partes[0].trim();
+        const nome = partes[1].trim();
+        if (!sobrenome || !nome) return texto.trim().replace(/\s+/g, " ");
+        return `${nome} ${sobrenome}`.replace(/\s+/g, " ").trim();
       }
 
       function escapeAttr(str) {
