@@ -343,7 +343,23 @@
           if (isSelect) {
             input.addEventListener("change", () => flushUpdate(c.id, field));
           } else {
-            input.addEventListener("blur", () => flushUpdate(c.id, field));
+            input.addEventListener("blur", async () => {
+  if (field === "pa") {
+    const duplicado = await verificarPADuplicada(c.id, input.value);
+
+    if (duplicado) {
+      alert(
+        `⚠ Atenção!\n\nJá existe um chamado aberto para a PA ${input.value}.\n\nChamado: ${duplicado.numero || "(sem número)"}\n\nVerifique antes de cadastrar outro para evitar duplicidade.`
+      );
+
+      input.focus();
+      input.select();
+      return;
+    }
+  }
+
+  flushUpdate(c.id, field);
+});
           }
         });
 
@@ -360,6 +376,23 @@
 
         return tr;
       }
+
+async function verificarPADuplicada(idAtual, pa) {
+  if (!pa.trim()) return false;
+
+  const { data, error } = await supabase
+    .from("chamados")
+    .select("id, numero")
+    .eq("pa", pa.trim())
+    .eq("status", "pendente");
+
+  if (error) {
+    console.error(error);
+    return false;
+  }
+
+  return data.find(c => c.id !== idAtual) || null;
+}
 
       // ---------- Gravação com debounce ----------
       const dbFieldMap = { obs: "observacoes" };
