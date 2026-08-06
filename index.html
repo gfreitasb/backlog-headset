@@ -61,13 +61,15 @@
       </div>
 
       <div class="filter-select">
-        <label for="typeFilter">Tipo</label>
-        <select id="typeFilter" aria-label="Filtrar por tipo de chamado">
-          <option value="todos">Todos os tipos</option>
-          <option value="Troca de Equipamento">Troca de Equipamento</option>
-          <option value="Manutenção">Manutenção</option>
-          <option value="Novo Colaborador">Novo Colaborador</option>
-          <option value="Outro">Outro</option>
+        <label for="fieldFilter">Campo</label>
+        <select id="fieldFilter" aria-label="Escolher campo para busca">
+          <option value="todos">Todos os campos</option>
+          <option value="numero">Nº Chamado</option>
+          <option value="solicitante">Solicitado por</option>
+          <option value="tipo">Tipo de chamado</option>
+          <option value="pa">Nº da PA</option>
+          <option value="obs">Observações</option>
+          <option value="status">Status</option>
         </select>
       </div>
 
@@ -87,11 +89,11 @@
         <thead>
           <tr>
             <th class="col-id" style="width:13%">Nº Chamado</th>
-            <th style="width:16%">Solicitado por</th>
-            <th style="width:16%">Tipo de chamado</th>
+            <th style="width:17%">Solicitado por</th>
+            <th style="width:18%">Tipo de chamado</th>
             <th class="col-pa" style="width:10%">Nº da PA</th>
-            <th style="width:24%">Observações</th>
-            <th style="width:11%">Status</th>
+            <th style="width:21%">Observações</th>
+            <th style="width:12%">Status</th>
             <th class="col-actions"></th>
           </tr>
         </thead>
@@ -127,7 +129,7 @@
       const emptyState = document.getElementById("emptyState");
       const paginationEl = document.getElementById("pagination");
       const searchInput = document.getElementById("searchInput");
-      const typeFilter = document.getElementById("typeFilter");
+      const fieldFilter = document.getElementById("fieldFilter");
       const addBtn = document.getElementById("addBtn");
       const exportBtn = document.getElementById("exportBtn");
       const statPendentes = document.getElementById("statPendentes");
@@ -137,7 +139,7 @@
       const syncStatusText = document.getElementById("syncStatusText");
 
       const PAGE_SIZE = 10;
-      let state = { filter: "todos", type: "todos", search: "", page: 1 };
+      let state = { filter: "todos", field: "todos", search: "", page: 1 };
       let chamados = [];
       const pendingTimers = {}; // debounce por linha+campo
 
@@ -238,9 +240,18 @@
 
         const visiveis = chamados.filter((c) => {
           if (state.filter !== "todos" && c.status !== state.filter) return false;
-          if (state.type !== "todos" && c.tipo !== state.type) return false;
           if (!term) return true;
-          const blob = `${c.numero} ${c.solicitante} ${c.tipo} ${c.pa} ${c.obs}`.toLowerCase();
+          const valoresBusca = {
+            numero: c.numero,
+            solicitante: c.solicitante,
+            tipo: c.tipo,
+            pa: c.pa,
+            obs: c.obs,
+            status: c.status === "pendente" ? "Pendente" : "Resolvido",
+          };
+          const blob = state.field === "todos"
+            ? Object.values(valoresBusca).join(" ").toLowerCase()
+            : (valoresBusca[state.field] || "").toLowerCase();
           return blob.includes(term);
         });
 
@@ -266,10 +277,14 @@
           }
         });
 
+        // Enquanto qualquer campo estiver ativo, preserva toda a ordem do DOM.
+        // Reordenar as outras linhas durante um clique pode mover o alvo e
+        // deixar o foco preso no registro anterior.
+        const tabelaEmEdicao = tableBody.contains(document.activeElement);
+
         // cria ou atualiza cada linha, na ordem correta
         pageItems.forEach((c) => {
           let tr = existing[c.id];
-          const sendoEditada = tr && tr.contains(document.activeElement);
 
           if (!tr) {
             tr = renderRow(c);
@@ -279,11 +294,7 @@
 
           updateRowFields(tr, c);
 
-          // Se o usuário está com o cursor em algum campo desta linha agora,
-          // não mexe na posição dela no DOM — mesmo um appendChild "sem efeito"
-          // (nó já na posição certa) pode resetar o cursor pro início do campo,
-          // fazendo o texto digitado aparecer invertido.
-          if (!sendoEditada) {
+          if (!tabelaEmEdicao) {
             tableBody.appendChild(tr);
           }
         });
@@ -377,7 +388,8 @@
             const chamado = chamados.find((x) => x.id === c.id);
             chamado[field] = input.value;
             if (field === "status") tr.classList.toggle("is-resolved", input.value === "resolvido");
-            queueUpdate(c.id, field, input.value);
+            // Numero e PA so sao gravados depois da verificacao de duplicidade.
+            if (field !== "numero" && field !== "pa") queueUpdate(c.id, field, input.value);
           });
 
           // "Solicitado por": se colar no formato "Sobrenome, Nome" (comum em
@@ -399,22 +411,33 @@
             input.addEventListener("change", () => flushUpdate(c.id, field));
           } else {
             input.addEventListener("blur", async () => {
-  if (field === "pa") {
-    const duplicado = await verificarPADuplicada(c.id, input.value);
+              if (field === "numero" || field === "pa") {
+                const duplicado = await verificarChamadoDuplicado(c.id, field, input.value);
 
-    if (duplicado) {
-      alert(
-        `⚠ Atenção!\n\nJá existe um chamado aberto para a PA ${input.value}.\n\nChamado: ${duplicado.numero || "(sem número)"}\n\nVerifique antes de cadastrar outro para evitar duplicidade.`
-      );
+                if (duplicado) {
+                  const identificador = field === "numero" ? "número de chamado" : "PA";
+                  alert(
+                    `⚠ Chamado duplicado!\n\nJá existe um chamado para este ${identificador}.\n\n` +
+                    `Chamado: ${duplicado.numero || "(sem número)"}\n` +
+                    `PA: ${duplicado.pa || "(sem PA)"}\n` +
+                    `Solicitante: ${duplicado.solicitante || "(não informado)"}\n` +
+                    `Status: ${duplicado.status === "pendente" ? "Pendente" : "Resolvido"}`
+                  );
 
-      input.focus();
-      input.select();
-      return;
-    }
-  }
+                  // Remove somente o valor duplicado. O banco preserva o valor
+                  // anterior ate que um novo identificador valido seja informado.
+                  const chamadoAtual = chamados.find((item) => item.id === c.id);
+                  input.value = "";
+                  if (chamadoAtual) chamadoAtual[field] = "";
 
-  flushUpdate(c.id, field);
-});
+                  // Aguarda o blur terminar para evitar um ciclo de foco/alerta.
+                  setTimeout(() => input.focus(), 0);
+                  return;
+                }
+              }
+
+              flushUpdate(c.id, field);
+            });
           }
         });
 
@@ -432,22 +455,34 @@
         return tr;
       }
 
-async function verificarPADuplicada(idAtual, pa) {
-  if (!pa.trim()) return false;
+      async function verificarChamadoDuplicado(idAtual, field, value) {
+        const valor = value.trim();
+        if (!valor) return null;
 
-  const { data, error } = await supabase
-    .from("chamados")
-    .select("id, numero")
-    .eq("pa", pa.trim())
-    .eq("status", "pendente");
+        const duplicadoLocal = chamados.find((item) =>
+          item.id !== idAtual &&
+          (item[field] || "").trim().toLowerCase() === valor.toLowerCase() &&
+          (field !== "pa" || item.status === "pendente")
+        );
+        if (duplicadoLocal) return duplicadoLocal;
 
-  if (error) {
-    console.error(error);
-    return false;
-  }
+        let query = supabase
+          .from("chamados")
+          .select("id, numero, pa, solicitante, status")
+          .eq(field, valor)
+          .neq("id", idAtual);
 
-  return data.find(c => c.id !== idAtual) || null;
-}
+        if (field === "pa") query = query.eq("status", "pendente");
+
+        const { data, error } = await query.limit(1);
+        if (error) {
+          console.error("Erro ao verificar duplicidade:", error);
+          setSyncStatus("error", "Falha ao verificar duplicidade");
+          return null;
+        }
+
+        return data[0] || null;
+      }
 
       // ---------- Gravação com debounce ----------
       const dbFieldMap = { obs: "observacoes" };
@@ -530,9 +565,11 @@ async function verificarPADuplicada(idAtual, pa) {
         render();
       });
 
-      typeFilter.addEventListener("change", (e) => {
-        state.type = e.target.value;
+      fieldFilter.addEventListener("change", (e) => {
+        state.field = e.target.value;
         state.page = 1;
+        const label = e.target.options[e.target.selectedIndex].text;
+        searchInput.placeholder = state.field === "todos" ? "Buscar por chamado, solicitante, PA..." : `Buscar em ${label}...`;
         render();
       });
 
