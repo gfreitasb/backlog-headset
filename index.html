@@ -88,6 +88,8 @@
         <h3>Nenhum chamado no backlog</h3>
         <p>Clique em "Novo chamado" para registrar o primeiro.</p>
       </div>
+
+      <div class="pagination" id="pagination" aria-label="Controles de paginação"></div>
     </div>
 
     <div class="footer-bar">
@@ -104,6 +106,7 @@
 
       const tableBody = document.getElementById("tableBody");
       const emptyState = document.getElementById("emptyState");
+      const paginationEl = document.getElementById("pagination");
       const searchInput = document.getElementById("searchInput");
       const addBtn = document.getElementById("addBtn");
       const exportBtn = document.getElementById("exportBtn");
@@ -113,7 +116,8 @@
       const syncStatusEl = document.getElementById("syncStatus");
       const syncStatusText = document.getElementById("syncStatusText");
 
-      let state = { filter: "todos", search: "" };
+      const PAGE_SIZE = 10;
+      let state = { filter: "todos", search: "", page: 1 };
       let chamados = [];
       const pendingTimers = {}; // debounce por linha+campo
 
@@ -219,7 +223,11 @@
           return blob.includes(term);
         });
 
-        emptyState.hidden = visiveis.length !== 0;
+        const totalPages = Math.max(1, Math.ceil(visiveis.length / PAGE_SIZE));
+        if (state.page > totalPages) state.page = totalPages;
+        const pageItems = visiveis.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
+
+        emptyState.hidden = pageItems.length !== 0;
 
         // mapa das linhas que já existem no DOM
         const existing = {};
@@ -227,7 +235,7 @@
           existing[tr.dataset.id] = tr;
         });
 
-        const wantedIds = new Set(visiveis.map((c) => c.id));
+        const wantedIds = new Set(pageItems.map((c) => c.id));
 
         // remove linhas que não devem mais aparecer (excluídas ou fora do filtro/busca)
         Object.keys(existing).forEach((id) => {
@@ -238,7 +246,7 @@
         });
 
         // cria ou atualiza cada linha, na ordem correta
-        visiveis.forEach((c) => {
+        pageItems.forEach((c) => {
           let tr = existing[c.id];
           const sendoEditada = tr && tr.contains(document.activeElement);
 
@@ -262,6 +270,32 @@
         const pendentesCount = chamados.filter((c) => c.status === "pendente").length;
         statPendentes.textContent = pendentesCount;
         totalCount.textContent = `${chamados.length} chamado${chamados.length === 1 ? "" : "s"} no total`;
+        renderPagination(totalPages);
+      }
+
+      function renderPagination(totalPages) {
+        if (totalPages <= 1) {
+          paginationEl.innerHTML = "";
+          return;
+        }
+
+        paginationEl.innerHTML = `
+          <button class="page-btn" data-action="prev" ${state.page <= 1 ? "disabled" : ""}>Anterior</button>
+          <span class="page-info">Página ${state.page} de ${totalPages}</span>
+          <button class="page-btn" data-action="next" ${state.page >= totalPages ? "disabled" : ""}>Próxima</button>
+        `;
+
+        paginationEl.querySelector('[data-action="prev"]').addEventListener("click", () => {
+          if (state.page <= 1) return;
+          state.page -= 1;
+          render();
+        });
+
+        paginationEl.querySelector('[data-action="next"]').addEventListener("click", () => {
+          if (state.page >= totalPages) return;
+          state.page += 1;
+          render();
+        });
       }
 
       // Atualiza os valores de uma linha existente sem recriar os elementos,
@@ -471,6 +505,7 @@ async function verificarPADuplicada(idAtual, pa) {
 
       searchInput.addEventListener("input", (e) => {
         state.search = e.target.value;
+        state.page = 1;
         render();
       });
 
@@ -479,6 +514,7 @@ async function verificarPADuplicada(idAtual, pa) {
           filterBtns.forEach((b) => b.classList.remove("is-active"));
           btn.classList.add("is-active");
           state.filter = btn.dataset.filter;
+          state.page = 1;
           render();
         });
       });
