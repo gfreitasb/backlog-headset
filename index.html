@@ -3,10 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co" />
   <title>Backlog de Chamados · Troca de Headset</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=2" />
+  <link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png?v=2" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
@@ -16,19 +21,22 @@
 
     <!-- Header -->
     <header class="header">
-      <div>
-        <div class="header__eyebrow">
-          <span class="waveform" aria-hidden="true">
-            <span></span><span></span><span></span><span></span><span></span>
-          </span>
-          Aguardando reposição de estoque
-        </div>
-        <div class="sync-status" id="syncStatus" data-state="connecting">
+      <div class="brand-row">
+        <img src="logo.svg" alt="Stefanini" class="brand-logo" />
+        <div class="brand-text">
+          <div class="header__eyebrow">
+            <span class="waveform" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+            </span>
+            Aguardando reposição de estoque
+          </div>
+          <div class="sync-status" id="syncStatus" data-state="connecting">
           <span class="sync-dot" aria-hidden="true"></span>
           <span id="syncStatusText">Conectando ao banco...</span>
         </div>
         <h1>Backlog de Chamados — Troca de Headset</h1>
         <p>Chamados que dependem da chegada de novos headsets para serem concluídos. Assim que o estoque chegar, marque como resolvido.</p>
+      </div>
       </div>
       <div class="stat-card">
         <div class="stat-card__value" id="statPendentes">0</div>
@@ -50,6 +58,17 @@
         <button class="filter-btn is-active" data-filter="todos">Todos</button>
         <button class="filter-btn" data-filter="pendente">Pendentes</button>
         <button class="filter-btn" data-filter="resolvido">Resolvidos</button>
+      </div>
+
+      <div class="filter-select">
+        <label for="typeFilter">Tipo</label>
+        <select id="typeFilter" aria-label="Filtrar por tipo de chamado">
+          <option value="todos">Todos os tipos</option>
+          <option value="Troca de Equipamento">Troca de Equipamento</option>
+          <option value="Manutenção">Manutenção</option>
+          <option value="Novo Colaborador">Novo Colaborador</option>
+          <option value="Outro">Outro</option>
+        </select>
       </div>
 
       <button class="btn btn-ghost" id="exportBtn">Exportar CSV</button>
@@ -108,6 +127,7 @@
       const emptyState = document.getElementById("emptyState");
       const paginationEl = document.getElementById("pagination");
       const searchInput = document.getElementById("searchInput");
+      const typeFilter = document.getElementById("typeFilter");
       const addBtn = document.getElementById("addBtn");
       const exportBtn = document.getElementById("exportBtn");
       const statPendentes = document.getElementById("statPendentes");
@@ -117,7 +137,7 @@
       const syncStatusText = document.getElementById("syncStatusText");
 
       const PAGE_SIZE = 10;
-      let state = { filter: "todos", search: "", page: 1 };
+      let state = { filter: "todos", type: "todos", search: "", page: 1 };
       let chamados = [];
       const pendingTimers = {}; // debounce por linha+campo
 
@@ -218,6 +238,7 @@
 
         const visiveis = chamados.filter((c) => {
           if (state.filter !== "todos" && c.status !== state.filter) return false;
+          if (state.type !== "todos" && c.tipo !== state.type) return false;
           if (!term) return true;
           const blob = `${c.numero} ${c.solicitante} ${c.tipo} ${c.pa} ${c.obs}`.toLowerCase();
           return blob.includes(term);
@@ -316,10 +337,10 @@
 
         tr.innerHTML = `
           <td class="col-id" data-label="Nº Chamado">
-            <input class="cell-input" data-field="numero" value="${escapeAttr(c.numero)}" placeholder="0000" />
+            <input class="cell-input" data-field="numero" value="${escapeAttr(c.numero)}" placeholder="0000" maxlength="40" />
           </td>
           <td data-label="Solicitado por">
-            <input class="cell-input" data-field="solicitante" value="${escapeAttr(c.solicitante)}" placeholder="Nome" />
+            <input class="cell-input" data-field="solicitante" value="${escapeAttr(c.solicitante)}" placeholder="Nome" maxlength="120" />
           </td>
           <td data-label="Tipo de chamado">
             <select class="cell-input" data-field="tipo">
@@ -327,7 +348,7 @@
             </select>
           </td>
           <td class="col-pa" data-label="Nº da PA">
-            <input class="cell-input" data-field="pa" value="${escapeAttr(c.pa)}" placeholder="PA-0000" />
+            <input class="cell-input" data-field="pa" value="${escapeAttr(c.pa)}" placeholder="PA-0000" maxlength="40" />
           </td>
           <td data-label="Observações">
             <textarea class="cell-input" data-field="obs" rows="1" placeholder="Observações...">${escapeHtml(c.obs)}</textarea>
@@ -509,6 +530,12 @@ async function verificarPADuplicada(idAtual, pa) {
         render();
       });
 
+      typeFilter.addEventListener("change", (e) => {
+        state.type = e.target.value;
+        state.page = 1;
+        render();
+      });
+
       filterBtns.forEach((btn) => {
         btn.addEventListener("click", () => {
           filterBtns.forEach((b) => b.classList.remove("is-active"));
@@ -523,7 +550,12 @@ async function verificarPADuplicada(idAtual, pa) {
         const header = ["Numero do Chamado", "Solicitado por", "Tipo de Chamado", "Numero da PA", "Observacoes", "Status"];
         const rows = chamados.map((c) => [c.numero, c.solicitante, c.tipo, c.pa, c.obs, c.status === "pendente" ? "Pendente" : "Resolvido"]);
         const csv = [header, ...rows]
-          .map((row) => row.map((cell) => `"${(cell || "").toString().replace(/"/g, '""')}"`).join(";"))
+          .map((row) => row.map((cell) => {
+            let safeCell = (cell || "").toString();
+            // Impede que planilhas executem o conteudo exportado como formula.
+            if (/^[=+\-@]/.test(safeCell)) safeCell = `'${safeCell}`;
+            return `"${safeCell.replace(/"/g, '""')}"`;
+          }).join(";"))
           .join("\r\n");
         const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);

@@ -17,6 +17,15 @@ create table if not exists chamados (
   updated_at    timestamptz not null default now()
 );
 
+-- Limites no banco: protegem tambem contra clientes que ignorem o HTML.
+alter table public.chamados drop constraint if exists chamados_text_limits;
+alter table public.chamados add constraint chamados_text_limits check (
+  char_length(numero) <= 40 and
+  char_length(solicitante) <= 120 and
+  char_length(pa) <= 40 and
+  char_length(observacoes) <= 1000
+);
+
 -- mantém updated_at sempre atual a cada edição
 create or replace function set_updated_at()
 returns trigger as $$
