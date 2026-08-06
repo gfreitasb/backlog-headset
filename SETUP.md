@@ -10,34 +10,44 @@
 2. Abra o arquivo `supabase-schema.sql` (está na mesma pasta deste guia), copie todo o conteúdo e cole no editor.
 3. Clique em **Run**. Isso cria a tabela `chamados`, as regras de acesso e insere 1 linha de exemplo.
 
-## 3. Pegar as credenciais
+## 3. Revogar a chave exposta
+No Supabase, abra **Project Settings -> API Keys**, gere/rotacione a chave
+publishable e revogue a anterior. Se o valor exposto era uma chave
+`service_role`/secret, revogue-a imediatamente e nunca a coloque no navegador.
+
+O schema deste projeto bloqueia o papel anonimo. Antes de reativar o aplicativo,
+configure o Supabase Auth e autorize apenas usuarios/e-mails da empresa.
+
+## 4. Pegar as credenciais
 1. No menu lateral, vá em **Project Settings** (ícone de engrenagem) → **API**.
 2. Copie o **Project URL**.
 3. Copie a chave em **Project API keys → anon public**.
 
-## 4. Preencher o `config.js`
+## 5. Preencher o `config.js`
 Abra o arquivo `config.js` e substitua:
 ```js
 const SUPABASE_URL = "COLE_AQUI_A_PROJECT_URL";
-const SUPABASE_ANON_KEY = "COLE_AQUI_A_ANON_KEY";
+const SUPABASE_ANON_KEY = "COLE_AQUI_A_CHAVE_PUBLISHABLE";
 ```
-pelos valores copiados no passo 3.
+pelos valores copiados no passo 4.
 
-## 5. Testar localmente (opcional)
+## 6. Testar localmente (opcional)
 Dentro da pasta do projeto:
 ```bash
 python3 -m http.server 8000
 ```
 Abra `http://localhost:8000` — o indicador no topo da página deve mostrar **"Sincronizado"** em verde.
 
-## 6. Publicar na Vercel
+## 7. Publicar na Vercel
 1. Suba os arquivos (`index.html`, `style.css`, `config.js`) para um repositório no GitHub.
 2. Na Vercel: **Add New → Project** → importe o repositório.
 3. Como é um site estático (sem framework), a Vercel detecta sozinha — não precisa configurar build command nem output directory. Clique em **Deploy**.
 4. Pronto: qualquer pessoa que acessar a URL vai ler e escrever no mesmo banco, em tempo real.
 
 ## Sobre segurança
-A chave `anon` fica visível no código-fonte da página — isso é esperado, ela é feita pra ser pública. O controle de acesso está nas regras (RLS) do banco, que hoje liberam leitura/escrita para quem tiver o link do site. Para um uso interno é aceitável, mas **não divulgue a URL publicamente**. Se depois quiser exigir login (ex: só e-mails da empresa), me avise que eu adiciono autenticação.
+A chave `publishable/anon` fica visível no código-fonte da página por design. Ela
+não autentica usuários e não protege dados. O RLS deste projeto bloqueia o papel
+anônimo; nunca exponha uma chave `service_role`/secret no frontend.
 
 ## Arquivos desta entrega
 | Arquivo | Função |

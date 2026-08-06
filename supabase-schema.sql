@@ -40,14 +40,30 @@ create trigger trg_chamados_updated_at
 -- com ela consegue ler e editar os dados, então não deixe o link do
 -- projeto público). Se depois quiser exigir login, me avise que eu
 -- adiciono Supabase Auth e troco essa policy para checar o usuário.
-alter table chamados enable row level security;
+alter table public.chamados enable row level security;
 
-drop policy if exists "allow all - app interno" on chamados;
-create policy "allow all - app interno"
-  on chamados
+drop policy if exists "allow all - app interno"
+  on public.chamados;
+
+drop policy if exists "authenticated users only"
+  on public.chamados;
+
+create policy "authenticated users only"
+  on public.chamados
   for all
-  using (true)
-  with check (true);
+  to authenticated
+  using (auth.uid() is not null)
+  with check (auth.uid() is not null);
+
+revoke all on table public.chamados from anon;
+grant select, insert, update, delete
+  on table public.chamados
+  to authenticated;
+
+-- A chave publishable fica visivel no navegador por design. O papel anonimo
+-- nao deve acessar os chamados; somente sessoes autenticadas recebem privilegios.
+revoke all on table public.chamados from anon;
+grant select, insert, update, delete on table public.chamados to authenticated;
 
 -- ---------------------------------------------------------
 -- Dado de exemplo (apague depois de conferir que funcionou)
