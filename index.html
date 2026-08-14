@@ -73,6 +73,14 @@
         </select>
       </div>
 
+      <div class="date-filter" role="group" aria-label="Filtrar por data de criação">
+        <label for="dateFrom">De</label>
+        <input type="date" id="dateFrom" aria-label="Data inicial" />
+        <label for="dateTo">Até</label>
+        <input type="date" id="dateTo" aria-label="Data final" />
+        <button class="date-filter__clear" id="clearDateFilter" type="button" hidden>Limpar</button>
+      </div>
+
       <button class="btn btn-ghost" id="exportBtn">Exportar CSV</button>
       <button class="btn btn-primary" id="addBtn">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -92,6 +100,7 @@
             <th class="col-requester">Solicitado por</th>
             <th class="col-type">Tipo de chamado</th>
             <th class="col-pa">Nº da PA</th>
+            <th class="col-date">Data</th>
             <th class="col-notes">Observações</th>
             <th class="col-status">Status</th>
             <th class="col-actions"></th>

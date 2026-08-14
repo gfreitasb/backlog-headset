@@ -7,6 +7,9 @@
   const paginationEl = document.getElementById("pagination");
   const searchInput = document.getElementById("searchInput");
   const fieldFilter = document.getElementById("fieldFilter");
+  const dateFromInput = document.getElementById("dateFrom");
+  const dateToInput = document.getElementById("dateTo");
+  const clearDateFilterBtn = document.getElementById("clearDateFilter");
   const addBtn = document.getElementById("addBtn");
   const exportBtn = document.getElementById("exportBtn");
   const statPendentes = document.getElementById("statPendentes");
@@ -16,7 +19,7 @@
   const syncStatusText = document.getElementById("syncStatusText");
 
   const PAGE_SIZE = 10;
-  let state = { filter: "todos", field: "todos", search: "", page: 1 };
+  let state = { filter: "todos", field: "todos", search: "", dateFrom: "", dateTo: "", page: 1 };
   let chamados = [];
   const pendingTimers = {}; // debounce por linha+campo
 
@@ -72,6 +75,7 @@
       pa: row.pa || "",
       obs: row.observacoes || "",
       status: row.status || "pendente",
+      createdAt: row.created_at,
     };
   }
 
@@ -117,6 +121,9 @@
 
     const visiveis = chamados.filter((c) => {
       if (state.filter !== "todos" && c.status !== state.filter) return false;
+      const chamadoDate = toLocalDateKey(c.createdAt);
+      if (state.dateFrom && chamadoDate < state.dateFrom) return false;
+      if (state.dateTo && chamadoDate > state.dateTo) return false;
       if (!term) return true;
       const valoresBusca = {
         numero: c.numero,
@@ -238,6 +245,7 @@
       <td class="col-pa" data-label="Nº da PA">
         <input class="cell-input" data-field="pa" value="${escapeAttr(c.pa)}" placeholder="PA-0000" maxlength="40" />
       </td>
+      <td class="col-date" data-label="Data">${formatDate(c.createdAt)}</td>
       <td data-label="Observações">
         <textarea class="cell-input" data-field="obs" rows="1" placeholder="Observações...">${escapeHtml(c.obs)}</textarea>
       </td>
@@ -412,6 +420,26 @@
     return escapeHtml(str).replace(/"/g, "&quot;");
   }
 
+  function toLocalDateKey(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function formatDate(value) {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(date);
+  }
+
   // ---------- Ações ----------
   addBtn.addEventListener("click", async () => {
     setSyncStatus("connecting", "Criando chamado...");
@@ -450,6 +478,22 @@
     render();
   });
 
+  function applyDateFilter() {
+    state.dateFrom = dateFromInput.value;
+    state.dateTo = dateToInput.value;
+    state.page = 1;
+    clearDateFilterBtn.hidden = !state.dateFrom && !state.dateTo;
+    render();
+  }
+
+  dateFromInput.addEventListener("change", applyDateFilter);
+  dateToInput.addEventListener("change", applyDateFilter);
+  clearDateFilterBtn.addEventListener("click", () => {
+    dateFromInput.value = "";
+    dateToInput.value = "";
+    applyDateFilter();
+  });
+
   filterBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       filterBtns.forEach((b) => b.classList.remove("is-active"));
@@ -461,8 +505,8 @@
   });
 
   exportBtn.addEventListener("click", () => {
-    const header = ["Numero do Chamado", "Solicitado por", "Tipo de Chamado", "Numero da PA", "Observacoes", "Status"];
-    const rows = chamados.map((c) => [c.numero, c.solicitante, c.tipo, c.pa, c.obs, c.status === "pendente" ? "Pendente" : "Resolvido"]);
+    const header = ["Numero do Chamado", "Solicitado por", "Tipo de Chamado", "Numero da PA", "Data", "Observacoes", "Status"];
+    const rows = chamados.map((c) => [c.numero, c.solicitante, c.tipo, c.pa, formatDate(c.createdAt), c.obs, c.status === "pendente" ? "Pendente" : "Resolvido"]);
     const csv = [header, ...rows]
       .map((row) => row.map((cell) => {
         let safeCell = (cell || "").toString();

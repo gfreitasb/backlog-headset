@@ -359,6 +359,40 @@ a {
   color: #ffffff;
 }
 
+.date-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.date-filter label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.date-filter input {
+  color-scheme: dark;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: 13px var(--font-body);
+  padding: 7px 8px;
+}
+
+.date-filter__clear {
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font: 13px var(--font-body);
+  padding: 6px;
+}
+
 .filter-btn {
   border: none;
   background: transparent;
@@ -446,12 +480,13 @@ table {
   border-collapse: collapse;
 }
 
-.col-id { width: 13%; }
-.col-requester { width: 17%; }
-.col-type { width: 18%; }
+.col-id { width: 11%; }
+.col-requester { width: 15%; }
+.col-type { width: 16%; }
 .col-pa { width: 10%; }
-.col-notes { width: 21%; }
-.col-status { width: 12%; }
+.col-date { width: 12%; }
+.col-notes { width: 18%; }
+.col-status { width: 10%; }
 
 thead th {
   text-align: left;
@@ -516,6 +551,13 @@ td .cell-input:focus {
 .col-pa .cell-input {
   font-family: var(--font-mono);
   color: var(--accent-strong);
+}
+
+.col-date {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .col-obs .cell-input {
@@ -758,5 +800,10 @@ td select.cell-input {
   .stat-card {
     text-align: left;
     width: 100%;
+  }
+
+  .date-filter {
+    width: 100%;
+    flex-wrap: wrap;
   }
 }
