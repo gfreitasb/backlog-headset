@@ -11,5 +11,4 @@
 // ===========================================================
 
 // Nunca use uma chave service_role/secret neste arquivo.
-const SUPABASE_URL = "https://iknfdifgtdbitbzpnhvs.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_VIHU551QEl9HWarsWW7UtQ_BkOH3MKC";
+
